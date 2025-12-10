@@ -1,0 +1,10 @@
+DOCKER_USERNAME: "abdelrahmanhassan678"
+
+images:
+  - name: "{{ DOCKER_USERNAME }}/fronend-react"
+    tag: "latest"
+    path: "./React-Frontend"
+
+  - name: "{{ DOCKER_USERNAME }}/backend-dotnet-api"
+    tag: "latest"
+    path: "./DotNet-Backend"

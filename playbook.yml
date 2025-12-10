@@ -1,0 +1,72 @@
+- name: Deploy App using Docker and Ansible
+  hosts: localhost
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars/main.yml
+    - vars/secrets.yml
+
+  tasks:
+
+    # 1. Add Docker repository (if not exists) centos 10 command
+    - name: Add Docker repository
+      command: dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      args:
+        creates: /etc/yum.repos.d/docker-ce.repo
+
+    # Install Docker and required plugins
+    - name: Install Docker and plugins
+      package:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    # Start and enable Docker service using systemd
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    # 2. Login to Docker Hub
+    - name: Login to Docker Hub
+      community.docker.docker_login:
+        username: "{{ DOCKER_USERNAME }}"
+        password: "{{ DOCKER_PASSWORD }}"
+
+    # 3. Build and Push Docker Images
+    - name: Build and push frontend & backend images
+      community.docker.docker_image:
+        build:
+          path: "{{ item.path }}"
+        name: "{{ item.name }}"
+        tag: "{{ item.tag }}"
+        push: yes
+        source: build
+      loop: "{{ images }}"
+
+    # 4. Create db_password.txt dynamically
+    - name: Create db_password.txt with DB_PASSWORD
+      copy:
+        dest: ./db_password.txt
+        content: "{{ DB_PASSWORD | trim }}"
+        mode: '0600'
+
+    # 5. Run Docker Compose
+    - name: Deploy app using Docker Compose
+      community.docker.docker_compose_v2:
+        # playbook_dir refrence current dir "same as my path /home/ahassan/Docker-Ansible-Project"
+        project_src: "{{ playbook_dir }}"
+        # (pstate:resent => docker compose up , state:absent => docker compose down)
+        state: present
+
+    # 6. Remove db_password.txt after deployment
+    - name: Remove temporary db_password.txt
+      file:
+        path: ./db_password.txt
+        state: absent
+
